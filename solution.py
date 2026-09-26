@@ -12,6 +12,24 @@
 4. Инференс: sigmoid(model(x)) -> p_180 — вероятность поворота на 180°.
 5. SEED=42 фиксирует random / numpy / torch — воспроизводимость.
 
+ГДЕ ИЩУТСЯ ТЕСТОВЫЕ ДАННЫЕ
+==========================
+Все пути — относительно папки, где лежит этот скрипт (корень решения).
+Скрипт автоматически перебирает стандартные расположения:
+
+  data/test/*.jpg          — основной вариант (датасет организатора)
+  test/*.jpg
+  data/images/*.jpg
+  images/*.jpg
+  data/*.jpg
+
+Также поддерживается CSV-режим (data/test.csv или test.csv): распознаются
+колонки image_id и image_path (или их синонимы). Если в CSV только image_id,
+путь достраивается по имени файла в соответствующей папке.
+
+Если данные не найдены, скрипт печатает список всех проверенных путей и
+завершается с ошибкой — тогда нужно положить картинки в одну из папок выше.
+
 ПОЧЕМУ ТАК
 ==========
 - Синтетика даёт бесплатные метки и учит модель на инвариантах, а не на шуме.
@@ -235,6 +253,10 @@ class TinyNet(nn.Module):
 # ============================================================
 
 def discover_test():
+    # Порядок проверки:
+    #   1. CSV + папка с картинками (если организатор выдал CSV)
+    #   2. Просто папка с картинками в стандартных местах
+    # Все пути — относительно папки, где лежит solution.py.
     cands = [
         (WORK / 'data' / 'test.csv', WORK / 'data' / 'test'),
         (WORK / 'test.csv',          WORK / 'test'),
@@ -243,8 +265,10 @@ def discover_test():
     ]
     for cp, idir in cands:
         if cp.exists(): return cp, idir
-    for d in (WORK / 'data' / 'test', WORK / 'test',
-              WORK / 'data' / 'images', WORK / 'images', WORK / 'data'):
+
+    img_dirs = [WORK / 'data' / 'test', WORK / 'test',
+                WORK / 'data' / 'images', WORK / 'images', WORK / 'data']
+    for d in img_dirs:
         if d.exists():
             fs = []
             for e in ('*.jpg','*.jpeg','*.png','*.webp','*.bmp','*.JPG','*.PNG'):
@@ -256,8 +280,18 @@ def discover_test():
 def load_test_items():
     csv_p, img_dir = discover_test()
     if csv_p is None and img_dir is None:
-        print('ERROR: test data not found', flush=True)
+        # Печатаем все места, где искали — чтобы было понятно, куда положить файлы.
+        print('ERROR: test data not found.', flush=True)
+        print('Looked for images in (any of these works):', flush=True)
+        for p in ('data/test/', 'test/', 'data/images/', 'images/', 'data/'):
+            print(f'  - {WORK / p}', flush=True)
+        print('Looked for CSV + folder in:', flush=True)
+        for p in ('data/test.csv + data/test/', 'test.csv + test/',
+                  'data/test.csv + data/images/', 'test.csv + images/'):
+            print(f'  - {WORK / p}', flush=True)
+        print('Put the test images into one of the folders above and re-run.', flush=True)
         sys.exit(1)
+
     if csv_p is not None:
         df = pd.read_csv(csv_p)
         print(f'CSV: {csv_p} rows={len(df)} cols={list(df.columns)}', flush=True)
@@ -282,6 +316,7 @@ def load_test_items():
                 return None
             paths = [res(i) for i in ids]
         return ids, paths
+
     fs = []
     for e in ('*.jpg','*.jpeg','*.png','*.webp','*.bmp'):
         fs += list(img_dir.glob(e))
