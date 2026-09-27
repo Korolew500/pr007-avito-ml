@@ -18,3 +18,7 @@ env/
 # OS
 Thumbs.db
 .DS_Store
+
+# Training log
+train.log
+submission_uncalibrated.csv
